@@ -6,6 +6,23 @@ import time
 import telebot
 from telebot import types
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Заглушка для веб-порта Render
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_web_server():
+    port = int(os.getenv("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# Запускаем сервер в фоновом потоке
+threading.Thread(target=run_web_server, daemon=True).start()
 
 # ================= НАСТРОЙКИ =================
 TOKEN = os.getenv("BOT_TOKEN")
