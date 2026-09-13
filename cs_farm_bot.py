@@ -65,6 +65,65 @@ INITIAL_SKINS = [
     ("★ Butterfly Knife | Doppler", 65000, "🟡★ Нож"),
 ]
 
+# Конфигурация 5 кейсов с повышенными шансами на нож в дорогих
+CASES_CONFIG = {
+    'weapon_case': {
+        'name': '📦 Weapon Case',
+        'price': 500,
+        'drops': [
+            {'name': 'Пыльник | Safari Mesh', 'chance': 60, 'type': 'common'},
+            {'name': 'MP7 | Urban Hazard', 'chance': 25, 'type': 'uncommon'},
+            {'name': 'AK-47 | Redline', 'chance': 10, 'type': 'classified'},
+            {'name': 'AWP | Asiimov', 'chance': 2.5, 'type': 'covert'},
+            {'name': '🔪 Нож | Karambit | Fade', 'chance': 2.5, 'type': 'knife'}
+        ]
+    },
+    'prisma_case': {
+        'name': '💎 Prisma Case',
+        'price': 1200,
+        'drops': [
+            {'name': 'MAC-10 | Grassland', 'chance': 55, 'type': 'common'},
+            {'name': 'Desert Eagle | Oxide Blaze', 'chance': 25, 'type': 'uncommon'},
+            {'name': 'M4A4 | Emperor', 'chance': 12, 'type': 'classified'},
+            {'name': 'M4A1-S | Printstream', 'chance': 4, 'type': 'covert'},
+            {'name': '🔪 Нож | Butterfly | Doppler', 'chance': 4, 'type': 'knife'}
+        ]
+    },
+    'dreams_case': {
+        'name': '🌙 Dreams & Nightmares',
+        'price': 2500,
+        'drops': [
+            {'name': 'MP5-SD | NecroJr', 'chance': 50, 'type': 'common'},
+            {'name': 'P250 | Visions', 'chance': 25, 'type': 'uncommon'},
+            {'name': 'AK-47 | Nightwish', 'chance': 13, 'type': 'classified'},
+            {'name': 'MP7 | Abyssal Apparition', 'chance': 5, 'type': 'covert'},
+            {'name': '🔪 Нож | Butterfly | Lore', 'chance': 7, 'type': 'knife'}
+        ]
+    },
+    'gamma_case': {
+        'name': '🟢 Gamma Case',
+        'price': 5000,
+        'drops': [
+            {'name': 'P90 | Grim', 'chance': 45, 'type': 'common'},
+            {'name': 'Tec-9 | Ice Cap', 'chance': 25, 'type': 'uncommon'},
+            {'name': 'M4A4 | Desolate Space', 'chance': 13, 'type': 'classified'},
+            {'name': 'AWP | Lore', 'chance': 5, 'type': 'covert'},
+            {'name': '🔪 Нож | M9 Bayonet | Gamma Doppler', 'chance': 12, 'type': 'knife'}
+        ]
+    },
+    'revo_case': {
+        'name': '🔥 Revolution Case',
+        'price': 10000,
+        'drops': [
+            {'name': 'MAC-10 | Stalker', 'chance': 40, 'type': 'common'},
+            {'name': 'SG 553 | Cyberforce', 'chance': 23, 'type': 'uncommon'},
+            {'name': 'AK-47 | Head Shot', 'chance': 12, 'type': 'classified'},
+            {'name': 'M4A4 | Temukau', 'chance': 5, 'type': 'covert'},
+            {'name': '🔪 Нож | Skeleton Knife | Case Hardened', 'chance': 20, 'type': 'knife'}
+        ]
+    }
+}
+
 
 def get_db():
     return sqlite3.connect("cs_database.db")
@@ -133,6 +192,7 @@ def check_user_exists(user_id, username):
 def main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("🎮 Фармить", "🛒 Магазин")
+    markup.row("📦 Кейсы", "⭐ Донат (Звезды)")
     markup.row("🎒 Профиль", "🏆 Топ 10")
     markup.row("🎟 Промокод")
     return markup
@@ -195,6 +255,8 @@ def start_cmd(message):
         f"Используй кнопки ниже для игры:\n"
         f"🎮 <b>Фармить</b> — получай монеты каждый час\n"
         f"🛒 <b>Магазин</b> — покупай редкие скины\n"
+        f"📦 <b>Кейсы</b> — открывай кейсы с повышенным шансом на нож\n"
+        f"⭐ <b>Донат</b> — покупай валюту за Telegram Stars\n"
         f"🎒 <b>Профиль</b> — смотри свою коллекцию и баланс\n"
         f"🏆 <b>Топ 10</b> — рейтинг самых ценных инвентарей\n"
         f"🎟 <b>Промокод</b> — активируй бонусные коды"
@@ -209,7 +271,7 @@ def start_cmd(message):
 @bot.message_handler(
     func=lambda m: m.text
     and any(
-        k in m.text for k in ["Фармить", "Магазин", "Профиль", "Топ 10", "Промокод"]
+        k in m.text for k in ["Фармить", "Магазин", "Кейсы", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
     )
 )
 def menu_handler(message):
@@ -220,6 +282,10 @@ def menu_handler(message):
         farm_logic(message)
     elif "Магазин" in text:
         show_shop(message)
+    elif "Кейсы" in text:
+        show_cases_menu(message)
+    elif "Донат" in text:
+        donate_menu_message(message)
     elif "Профиль" in text:
         show_profile(message)
     elif "Топ 10" in text:
@@ -277,6 +343,148 @@ def show_shop(message):
     )
 
 
+# --- МЕНЮ КЕЙСОВ ---
+def show_cases_menu(message):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for case_key, case_data in CASES_CONFIG.items():
+        markup.add(
+            types.InlineKeyboardButton(
+                f"{case_data['name']} — 💰 {case_data['price']:,} монет", 
+                callback_data=f"open_case_{case_key}"
+            )
+        )
+    bot.send_message(
+        message.chat.id,
+        "📦 <b>Магазин кейсов</b>\nВыбирай кейс и пытайся выбить нож! В дорогих кейсах шанс на нож выше:",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('open_case_'))
+def process_case_opening(call):
+    user_id = call.from_user.id
+    case_key = call.data.replace('open_case_', '')
+    if case_key not in CASES_CONFIG:
+        return
+        
+    case = CASES_CONFIG[case_key]
+    price = case['price']
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance, inventory FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return
+        balance, inv_json = row
+        
+        if balance < price:
+            bot.answer_callback_query(call.id, f"❌ Недостаточно монет! Нужно {price:,} 💰", show_alert=True)
+            return
+            
+        # Розыгрыш предмета
+        roll = random.uniform(0, 100)
+        current_sum = 0
+        won_item = case['drops'][0]
+        
+        for item in case['drops']:
+            current_sum += item['chance']
+            if roll <= current_sum:
+                won_item = item
+                break
+                
+        inventory = json.loads(inv_json)
+        inventory.append(won_item['name'])
+        
+        cursor.execute(
+            "UPDATE users SET balance = balance - ?, inventory = ? WHERE user_id = ?",
+            (price, json.dumps(inventory, ensure_ascii=False), user_id)
+        )
+        conn.commit()
+        new_balance = balance - price
+        
+    if won_item['type'] == 'knife':
+        text = f"🔥🔥 УЛЬТРА-ДРОП! 🔥🔥\nИз кейса {case['name']} выпал редчайший нож:\n🌟 **{won_item['name']}**"
+    else:
+        text = f"📦 Открыт {case['name']}\nТебе выпало: **{won_item['name']}**\n💰 Баланс: {new_balance:,}"
+        
+    bot.answer_callback_query(call.id, "Кейс успешно открыт!")
+    bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
+
+
+# --- ДОНАТ ЗА ЗВЕЗДЫ TELEGRAM ---
+def donate_menu_message(message):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("⭐ 15 звезд = 10,000 монет", callback_data="pay_stars_15"),
+        types.InlineKeyboardButton("⭐ 30 звезд = 30,000 монет", callback_data="pay_stars_30"),
+        types.InlineKeyboardButton("⭐ 40 звезд = 50,000 монет", callback_data="pay_stars_40")
+    )
+    bot.send_message(
+        message.chat.id,
+        "⭐ <b>Покупка игровой валюты за Telegram Stars</b>\n\nВыбери подходящий пакет:",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('pay_stars_'))
+def send_star_invoice(call):
+    stars_amount = int(call.data.replace('pay_stars_', ''))
+    
+    packages = {
+        15: {'coins': 10000, 'title': 'Пакет "Старт" (10k монет)'},
+        30: {'coins': 30000, 'title': 'Пакет "Медиум" (30k монет)'},
+        40: {'coins': 50000, 'title': 'Пакет "Премиум" (50k монет)'}
+    }
+    
+    pkg = packages.get(stars_amount)
+    if not pkg:
+        return
+
+    prices = [types.LabeledPrice(label="Telegram Stars", amount=stars_amount)]
+    
+    bot.send_invoice(
+        chat_id=call.message.chat.id,
+        title=pkg['title'],
+        description=f"Пополнение баланса в CS2 симуляторе на {pkg['coins']:,} монет.",
+        invoice_payload=f"add_coins_{pkg['coins']}",
+        provider_token="",
+        currency="XTR",
+        prices=prices,
+        reply_markup=types.InlineKeyboardMarkup().add(
+            types.InlineKeyboardButton(f"Оплатить ⭐ {stars_amount}", pay=True)
+        )
+    )
+
+
+@bot.pre_checkout_query_handler(func=lambda query: True)
+def checkout(pre_checkout_query):
+    bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+@bot.message_handler(content_types=['successful_payment'])
+def got_payment(message):
+    payment_info = message.successful_payment
+    payload = payment_info.invoice_payload
+    user_id = message.from_user.id
+    
+    if payload.startswith("add_coins_"):
+        coins_to_add = int(payload.replace("add_coins_", ""))
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (coins_to_add, user_id))
+            conn.commit()
+        
+        bot.send_message(
+            message.chat.id,
+            f"🎉 <b>Оплата прошла успешно!</b>\nНа твой баланс зачислено: <b>+{coins_to_add:,} монет</b> 💰\nПриятной игры и удачи с ножами!",
+            parse_mode="HTML"
+        )
+
+
 def show_profile(message):
     user_id = message.from_user.id
     with get_db() as conn:
@@ -306,9 +514,9 @@ def show_profile(message):
     )
 
     if inventory:
-        text += "\n".join([f"• {item}" for item in inventory])
+        text += "\n".join([f"• {item}" for item in inventory[-20:]])
     else:
-        text += "<i>Пусто. Купи что-нибудь в магазине!</i>"
+        text += "<i>Пусто. Купи что-нибудь в магазине или открой кейс!</i>"
 
     try:
         photos = bot.get_user_profile_photos(user_id)
@@ -356,7 +564,7 @@ def show_top(message):
 
     for i, (name, val) in enumerate(top_10, 1):
         icon = medals[i - 1] if i <= 3 else f"{i}."
-        text += f"{icon} <b>{name}</b> — {val} 💰\n"
+        text += f"{icon} <b>{name}</b> — {val:,} 💰\n"
 
     bot.send_message(message.chat.id, text, parse_mode="HTML")
 
@@ -372,10 +580,9 @@ def process_promo(message):
     if not message.text:
         return
 
-    # Если пользователь нажало кнопку меню вместо ввода кода — перенаправляем
     if any(
         k in message.text
-        for k in ["Фармить", "Магазин", "Профиль", "Топ 10", "Промокод"]
+        for k in ["Фармить", "Магазин", "Кейсы", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
     ):
         menu_handler(message)
         return
@@ -386,8 +593,7 @@ def process_promo(message):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT reward, max_activations, used_count FROM promocodes WHERE"
-            " code = ?",
+            "SELECT reward, max_activations, used_count FROM promocodes WHERE code = ?",
             (code,),
         )
         promo = cursor.fetchone()
@@ -433,8 +639,7 @@ def process_promo(message):
 
     bot.send_message(
         message.chat.id,
-        f"🎉 <b>Промокод активирован!</b>\nТебе зачислено: <b>+{reward}</b>"
-        " монет! 💰",
+        f"🎉 <b>Промокод активирован!</b>\nТебе зачислено: <b>+{reward}</b> монет! 💰",
         parse_mode="HTML",
     )
 
@@ -465,8 +670,7 @@ def addpromo_cmd(message):
     if len(args) < 4:
         bot.send_message(
             message.chat.id,
-            "❌ Использование: /addpromo [КОД] [СУММА] [АКТИВАЦИИ]\nПример:"
-            " /addpromo GIFT1000 1000 10",
+            "❌ Использование: /addpromo [КОД] [СУММА] [АКТИВАЦИИ]\nПример: /addpromo GIFT1000 1000 10",
         )
         return
 
@@ -482,16 +686,14 @@ def addpromo_cmd(message):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT OR REPLACE INTO promocodes (code, reward, max_activations,"
-            " used_count) VALUES (?, ?, ?, 0)",
+            "INSERT OR REPLACE INTO promocodes (code, reward, max_activations, used_count) VALUES (?, ?, ?, 0)",
             (code, int(reward), int(max_act)),
         )
         conn.commit()
 
     bot.send_message(
         message.chat.id,
-        f"✅ Промокод <b>{code}</b> создан!\n💰 Награда: {reward} монет\n👥 Лимит:"
-        f" {max_act} человек",
+        f"✅ Промокод <b>{code}</b> создан!\n💰 Награда: {reward} монет\n👥 Лимит: {max_act} человек",
         parse_mode="HTML",
     )
 
@@ -607,6 +809,6 @@ def callback_handler(call):
 
 if __name__ == "__main__":
     init_db()
-    print("🚀 Ошибки кнопок устранены! Бот готов к работе.")
+    print("🚀 Бот успешно запущен со всеми функциями магазина, кейсов и доната!")
     bot.remove_webhook()
-bot.infinity_polling(skip_pending=True)
+    bot.infinity_polling(skip_pending=True)
