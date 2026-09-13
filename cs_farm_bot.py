@@ -32,27 +32,72 @@ ADMIN_ID = 7917555581  # Вставь свой Telegram ID (число)
 bot = telebot.TeleBot(TOKEN)
 ITEMS_PER_PAGE = 5
 
+# 75+ скинов и ножей
 INITIAL_SKINS = [
+    # Ширпотреб (⚪)
     ("P250 | Sand Dune", 100, "⚪ Ширпотреб"),
     ("AK-47 | Safari Mesh", 150, "⚪ Ширпотреб"),
+    ("PP-Bizon | Sand Dashed", 120, "⚪ Ширпотреб"),
+    ("Nova | Sand Dune", 110, "⚪ Ширпотреб"),
+    ("P90 | Sand Spray", 130, "⚪ Ширпотреб"),
+    ("SSG 08 | Blue Spruce", 140, "⚪ Ширпотреб"),
+    ("Galil AR | Sage Spray", 160, "⚪ Ширпотреб"),
+    ("FAMAS | Colony", 135, "⚪ Ширпотреб"),
+    ("MAC-10 | Tornado", 125, "⚪ Ширпотреб"),
+    ("AUG | Contractor", 145, "⚪ Ширпотреб"),
+    # Армейское (🟦)
     ("Glock-18 | High Beam", 250, "🟦 Армейское"),
     ("AWP | Pit Viper", 350, "🟦 Армейское"),
     ("M4A4 | Magnesium", 450, "🟦 Армейское"),
+    ("USP-S | Forest Leaves", 220, "🟦 Армейское"),
+    ("Desert Eagle | Oxide Blaze", 300, "🟦 Армейское"),
+    ("MP7 | Urban Hazard", 280, "🟦 Армейское"),
+    ("Tec-9 | Ice Cap", 290, "🟦 Армейское"),
+    ("P90 | Grim", 320, "🟦 Армейское"),
+    ("SG 553 | Cyberforce", 380, "🟦 Армейское"),
+    ("MAC-10 | Grassland", 270, "🟦 Армейское"),
+    ("MP5-SD | NecroJr", 310, "🟦 Армейское"),
+    ("P250 | Visions", 400, "🟦 Армейское"),
+    # Запрещенное (🟪)
     ("Desert Eagle | Light Rail", 600, "🟪 Запрещенное"),
     ("USP-S | Cyrex", 800, "🟪 Запрещенное"),
     ("AK-47 | Rat Rod", 1000, "🟪 Запрещенное"),
     ("AWP | Atheris", 1200, "🟪 Запрещенное"),
     ("M4A1-S | Nightmare", 1500, "🟪 Запрещенное"),
+    ("M4A4 | Desolate Space", 1400, "🟪 Запрещенное"),
+    ("AK-47 | Nightwish", 1600, "🟪 Запрещенное"),
+    ("Galil AR | Cerberus", 1100, "🟪 Запрещенное"),
+    ("FAMAS | Eye of Athena", 1300, "🟪 Запрещенное"),
+    ("AUG | Stymphalian", 950, "🟪 Запрещенное"),
+    ("P90 | Asiimov", 1700, "🟪 Запрещенное"),
+    ("SSG 08 | Blood in the Water", 1850, "🟪 Запрещенное"),
+    # Засекреченное (💖)
     ("AK-47 | Redline", 2000, "💖 Засекреченное"),
     ("AWP | Redline", 2500, "💖 Засекреченное"),
     ("Desert Eagle | Code Red", 3000, "💖 Засекреченное"),
     ("M4A4 | Neo-Noir", 3500, "💖 Засекреченное"),
     ("USP-S | Kill Confirmed", 4500, "💖 Засекреченное"),
+    ("M4A4 | Emperor", 3200, "💖 Засекреченное"),
+    ("AK-47 | Head Shot", 3800, "💖 Засекреченное"),
+    ("MP7 | Abyssal Apparition", 2200, "💖 Засекреченное"),
+    ("SG 553 | Integrale", 4100, "💖 Засекреченное"),
+    ("AUG | Akihabara Accept", 4800, "💖 Засекреченное"),
+    ("P250 | Asiimov", 2600, "💖 Засекреченное"),
+    ("Glock-18 | Wasteland Rebel", 3300, "💖 Засекреченное"),
+    # Тайное (🔴)
     ("AK-47 | The Empress", 6000, "🔴 Тайное"),
     ("M4A1-S | Printstream", 7500, "🔴 Тайное"),
     ("AWP | Asiimov", 9000, "🔴 Тайное"),
     ("AK-47 | Fire Serpent", 15000, "🔴 Тайное"),
     ("AWP | Dragon Lore", 30000, "🔴 Тайное"),
+    ("AWP | Lore", 14000, "🔴 Тайное"),
+    ("M4A4 | Temukau", 8500, "🔴 Тайное"),
+    ("AK-47 | Inheritance", 11000, "🔴 Тайное"),
+    ("AWP | Chrome Cannon", 9500, "🔴 Тайное"),
+    ("Zeus x27 | Olympus", 5500, "🔴 Тайное"),
+    ("M4A1-S | Player Two", 6800, "🔴 Тайное"),
+    ("USP-S | Printstream", 8200, "🔴 Тайное"),
+    # Ножи и редкие ★ (🟡)
     ("★ Gut Knife | Doppler", 12000, "🟡★ Нож"),
     ("★ Flip Knife | Tiger Tooth", 15000, "🟡★ Нож"),
     ("★ Huntsman Knife | Fade", 18000, "🟡★ Нож"),
@@ -63,6 +108,16 @@ INITIAL_SKINS = [
     ("★ M9 Bayonet | Gamma Doppler", 40000, "🟡★ Нож"),
     ("★ Karambit | Fade", 50000, "🟡★ Нож"),
     ("★ Butterfly Knife | Doppler", 65000, "🟡★ Нож"),
+    ("★ Kukri Knife | Fade", 45000, "🟡★ Нож"),
+    ("★ Skeleton Knife | Case Hardened", 42000, "🟡★ Нож"),
+    ("★ Talon Knife | Marble Fade", 48000, "🟡★ Нож"),
+    ("★ Stiletto Knife | Tiger Tooth", 31000, "🟡★ Нож"),
+    ("★ Ursus Knife | Doppler", 25000, "🟡★ Нож"),
+    ("★ Navaja Knife | Crimson Web", 11000, "🟡★ Нож"),
+    ("★ Paracord Knife | Slaughter", 29000, "🟡★ Нож"),
+    ("★ Nomad Knife | Fade", 38000, "🟡★ Нож"),
+    ("★ Classic Knife | Fade", 34000, "🟡★ Нож"),
+    ("★ Shadow Daggers | Lore", 21000, "🟡★ Нож"),
 ]
 
 # Конфигурация 5 кейсов с повышенными шансами на нож в дорогих
@@ -192,7 +247,8 @@ def check_user_exists(user_id, username):
 def main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("🎮 Фармить", "🛒 Магазин")
-    markup.row("📦 Кейсы", "⭐ Донат (Звезды)")
+    markup.row("📦 Кейсы", "🎯 Апгрейдер")
+    markup.row("💣 Мины", "⭐ Донат (Звезды)")
     markup.row("🎒 Профиль", "🏆 Топ 10")
     markup.row("🎟 Промокод")
     return markup
@@ -254,8 +310,10 @@ def start_cmd(message):
         f"Добро пожаловать в CS2 Симулятор, <b>{username}</b>!\n\n"
         f"Используй кнопки ниже для игры:\n"
         f"🎮 <b>Фармить</b> — получай монеты каждый час\n"
-        f"🛒 <b>Магазин</b> — покупай редкие скины\n"
+        f"🛒 <b>Магазин</b> — покупай редкие скины (75+ штук)\n"
         f"📦 <b>Кейсы</b> — открывай кейсы с повышенным шансом на нож\n"
+        f"🎯 <b>Апгрейдер</b> — рискуй скинами ради крутого апгрейда\n"
+        f"💣 <b>Мины</b> — мини-игра Сапер со ставками и множителями\n"
         f"⭐ <b>Донат</b> — покупай валюту за Telegram Stars\n"
         f"🎒 <b>Профиль</b> — смотри свою коллекцию и баланс\n"
         f"🏆 <b>Топ 10</b> — рейтинг самых ценных инвентарей\n"
@@ -271,7 +329,7 @@ def start_cmd(message):
 @bot.message_handler(
     func=lambda m: m.text
     and any(
-        k in m.text for k in ["Фармить", "Магазин", "Кейсы", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
+        k in m.text for k in ["Фармить", "Магазин", "Кейсы", "Апгрейдер", "Мины", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
     )
 )
 def menu_handler(message):
@@ -284,6 +342,10 @@ def menu_handler(message):
         show_shop(message)
     elif "Кейсы" in text:
         show_cases_menu(message)
+    elif "Апгрейдер" in text:
+        show_upgrader_menu(message)
+    elif "Мины" in text:
+        show_mines_menu(message)
     elif "Донат" in text:
         donate_menu_message(message)
     elif "Профиль" in text:
@@ -337,7 +399,7 @@ def show_shop(message):
     markup, _ = get_shop_markup(page=0)
     bot.send_message(
         message.chat.id,
-        "🛒 <b>КАТАЛОГ СКИНОВ CS2</b>\nВыбери скин для покупки:",
+        "🛒 <b>КАТАЛОГ СКИНОВ CS2 (75+ ПОЗИЦИЙ)</b>\nВыбери скин для покупки:",
         parse_mode="HTML",
         reply_markup=markup,
     )
@@ -383,7 +445,6 @@ def process_case_opening(call):
             bot.answer_callback_query(call.id, f"❌ Недостаточно монет! Нужно {price:,} 💰", show_alert=True)
             return
             
-        # Розыгрыш предмета
         roll = random.uniform(0, 100)
         current_sum = 0
         won_item = case['drops'][0]
@@ -411,6 +472,255 @@ def process_case_opening(call):
         
     bot.answer_callback_query(call.id, "Кейс успешно открыт!")
     bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
+
+
+# --- АПГРЕЙДЕР ---
+def show_upgrader_menu(message):
+    user_id = message.from_user.id
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT inventory FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row or not json.loads(row[0]):
+            bot.send_message(message.chat.id, "🎯 <b>Апгрейдер</b>\n\nТвой инвентарь пуст! Сначала купи скин в магазине или выбей из кейса.", parse_mode="HTML")
+            return
+
+        cursor.execute("SELECT name, price, rarity FROM shop")
+        shop_items = cursor.fetchall()
+
+    inventory = json.loads(row[0])
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    # Берем последние 5 уникальных предметов из инвентаря для апгрейда
+    unique_inv = list(dict.fromkeys(inventory))[-5:]
+    for item_name in unique_inv:
+        markup.add(types.InlineKeyboardButton(f"🎯 Апгрейдить: {item_name}", callback_data=f"upg_sel_{item_name}"))
+
+    bot.send_message(
+        message.chat.id,
+        "🎯 <b>Апгрейдер скинов</b>\nВыбери предмет из своего инвентаря, который хочешь проапгрейдить до более дорогого:",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('upg_sel_'))
+def upg_select_item(call):
+    item_name = call.data.replace('upg_sel_', '')
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, price, rarity FROM shop")
+        shop_items = cursor.fetchall()
+    
+    price_map = {f"{rarity} {name}": price for name, price, rarity in shop_items}
+    item_price = price_map.get(item_name, 500)
+
+    # Находим скины дороже выбранного
+    better_items = [(name, price, rarity) for name, price, rarity in shop_items if price > item_price]
+    if not better_items:
+        bot.answer_callback_query(call.id, "❌ У тебя топовый скин, выше некуда!", show_alert=True)
+        return
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    # Выберем до 5 возможных целей для апгрейда
+    sample_targets = random.sample(better_items, min(5, len(better_items)))
+    for name, price, rarity in sample_targets:
+        target_full = f"{rarity} {name}"
+        chance = max(5, min(90, int((item_price / price) * 85)))
+        markup.add(types.InlineKeyboardButton(f"{target_full} ({price} 💰) — Шанс: {chance}%", callback_data=f"upg_do_{item_name}_{price}"))
+
+    bot.edit_message_text(
+        f"🎯 Выбран скин: <b>{item_name}</b> (≈ {item_price} 💰)\nВыбери цель для апгрейда:",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode="HTML",
+        reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('upg_do_'))
+def upg_execute(call):
+    parts = call.data.replace('upg_do_', '').rsplit('_', 1)
+    if len(parts) != 2:
+        return
+    item_name, target_price_str = parts
+    target_price = int(target_price_str)
+    user_id = call.from_user.id
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT inventory FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return
+        inventory = json.loads(row[0])
+        if item_name not in inventory:
+            bot.answer_callback_query(call.id, "❌ У тебя больше нет этого скина!", show_alert=True)
+            return
+
+        cursor.execute("SELECT name, price, rarity FROM shop")
+        shop_items = cursor.fetchall()
+        price_map = {f"{rarity} {name}": price for name, price, rarity in shop_items}
+        item_price = price_map.get(item_name, 500)
+
+        chance = max(5, min(90, int((item_price / target_price) * 85)))
+        
+        # Удаляем скин из инвентаря
+        inventory.remove(item_name)
+        
+        roll = random.randint(1, 100)
+        success = roll <= chance
+
+        if success:
+            # Ищем скин с целевой ценой
+            matching = [f"{rarity} {name}" for name, price, rarity in shop_items if price == target_price]
+            won_skin = random.choice(matching) if matching else "★ Butterfly Knife | Doppler"
+            inventory.append(won_skin)
+            result_text = f"🎉 <b>УСПЕХ! Апгрейд удался!</b>\nТы получил крутой скин: <b>{won_skin}</b>"
+        else:
+            result_text = f"💥 <b>НЕУДАЧА!</b>\nШанс был {chance}%, скин сгорел..."
+
+        cursor.execute("UPDATE users SET inventory = ? WHERE user_id = ?", (json.dumps(inventory, ensure_ascii=False), user_id))
+        conn.commit()
+
+    bot.answer_callback_query(call.id, "Апгрейд завершен!")
+    bot.send_message(call.message.chat.id, result_text, parse_mode="HTML")
+
+
+# --- МИНИ-ИГРА "МИНЫ" (САПЕР) ---
+ACTIVE_MINES_GAMES = {}
+
+def show_mines_menu(message):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("💰 Ставка: 500", callback_data="mines_bet_500"),
+        types.InlineKeyboardButton("💰 Ставка: 1,000", callback_data="mines_bet_1000"),
+        types.InlineKeyboardButton("💰 Ставка: 5,000", callback_data="mines_bet_5000"),
+        types.InlineKeyboardButton("💰 Ставка: 10,000", callback_data="mines_bet_10000"),
+    )
+    bot.send_message(
+        message.chat.id,
+        "💣 <b>Мини-игра «Мины»</b>\n\nВыбери сумму ставки, чтобы начать игру. На поле запрятаны мины — открывай безопасные ячейки и увеличивай свой выигрыш!",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mines_bet_'))
+def start_mines_game(call):
+    bet = int(call.data.replace('mines_bet_', ''))
+    user_id = call.from_user.id
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row or row[0] < bet:
+            bot.answer_callback_query(call.id, f"❌ Недостаточно монет! Нужно {bet:,} 💰", show_alert=True)
+            return
+        cursor.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (bet, user_id))
+        conn.commit()
+
+    # Создаем поле 3x3 (9 ячеек), из них 2 мины
+    mines = set(random.sample(range(9), 2))
+    ACTIVE_MINES_GAMES[user_id] = {
+        'bet': bet,
+        'mines': mines,
+        'revealed': set(),
+        'multiplier': 1.0
+    }
+
+    bot.answer_callback_query(call.id, "Игра начата!")
+    send_mines_board(call.message, user_id, edit=False)
+
+
+def send_mines_board(message, user_id, edit=True):
+    game = ACTIVE_MINES_GAMES.get(user_id)
+    if not game:
+        return
+
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    buttons = []
+    for i in range(9):
+        if i in game['revealed']:
+            buttons.append(types.InlineKeyboardButton("💎", callback_data="mines_noop"))
+        else:
+            buttons.append(types.InlineKeyboardButton("❓", callback_data=f"mines_click_{i}"))
+    
+    markup.add(*buttons)
+    if len(game['revealed']) > 0:
+        current_win = int(game['bet'] * game['multiplier'])
+        markup.add(types.InlineKeyboardButton(f"💰 Забрать выигрыш ({current_win:,} 💰)", callback_data="mines_cashout"))
+
+    text = f"💣 <b>Мины | Ставка: {game['bet']:,}</b>\nМножитель: <b>x{game['multiplier']:.2f}</b>\nБезопасных ячеек открыто: {len(game['revealed'])}/7"
+
+    if edit:
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, parse_mode="HTML", reply_markup=markup)
+        except Exception:
+            bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+    else:
+            bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mines_click_'))
+def process_mines_click(call):
+    user_id = call.from_user.id
+    game = ACTIVE_MINES_GAMES.get(user_id)
+    if not game:
+        bot.answer_callback_query(call.id, "Игра не найдена. Начни заново!", show_alert=True)
+        return
+
+    idx = int(call.data.replace('mines_click_', ''))
+    if idx in game['mines']:
+        # Подорвался
+        bet = game['bet']
+        del ACTIVE_MINES_GAMES[user_id]
+        bot.answer_callback_query(call.id, "💥 Бум! Ты подорвался на мине!", show_alert=True)
+        bot.edit_message_text(f"💥 <b>Ты попался на мину!</b>\nСтавка {bet:,} сгорела.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
+        return
+
+    if idx not in game['revealed']:
+        game['revealed'].add(idx)
+        game['multiplier'] += 0.35
+
+    if len(game['revealed']) >= 7:
+        # Победа автоматически
+        win = int(game['bet'] * game['multiplier'])
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (win, user_id))
+            conn.commit()
+        del ACTIVE_MINES_GAMES[user_id]
+        bot.answer_callback_query(call.id, "🎉 Поздравляем, все безопасные ячейки открыты!")
+        bot.edit_message_text(f"🏆 <b>ИДЕАЛЬНАЯ ПОБЕДА!</b>\nТы забрал сокровища и выиграл: <b>+{win:,} монет</b> 💰", call.message.chat.id, call.message.message_id, parse_mode="HTML")
+        return
+
+    bot.answer_callback_query(call.id, "Чисто! Идем дальше.")
+    send_mines_board(call.message, user_id, edit=True)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'mines_cashout')
+def process_mines_cashout(call):
+    user_id = call.from_user.id
+    game = ACTIVE_MINES_GAMES.get(user_id)
+    if not game:
+        return
+
+    win = int(game['bet'] * game['multiplier'])
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (win, user_id))
+        conn.commit()
+
+    del ACTIVE_MINES_GAMES[user_id]
+    bot.answer_callback_query(call.id, f"Выигрыш успешно зачислен!")
+    bot.edit_message_text(f"✅ <b>Выигрыш забран!</b>\nТвоя добыча: <b>+{win:,} монет</b> 💰", call.message.chat.id, call.message.message_id, parse_mode="HTML")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'mines_noop')
+def mines_noop(call):
+    bot.answer_callback_query(call.id, "Эта ячейка уже открыта!")
 
 
 # --- ДОНАТ ЗА ЗВЕЗДЫ TELEGRAM ---
@@ -582,7 +892,7 @@ def process_promo(message):
 
     if any(
         k in message.text
-        for k in ["Фармить", "Магазин", "Кейсы", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
+        for k in ["Фармить", "Магазин", "Кейсы", "Апгрейдер", "Мины", "Донат (Звезды)", "Профиль", "Топ 10", "Промокод"]
     ):
         menu_handler(message)
         return
@@ -734,8 +1044,7 @@ def additem_cmd(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    if call.data == "ignore":
-        bot.answer_callback_query(call.id)
+    if call.data == "ignore" or call.data.startswith('mines_'):
         return
 
     if call.data.startswith("page_"):
@@ -809,6 +1118,6 @@ def callback_handler(call):
 
 if __name__ == "__main__":
     init_db()
-    print("🚀 Бот успешно запущен со всеми функциями магазина, кейсов и доната!")
+    print("🚀 Бот успешно запущен: 75+ скинов, апгрейдер и мини-игра «Мины» активны!")
     bot.remove_webhook()
     bot.infinity_polling(skip_pending=True)
