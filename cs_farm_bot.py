@@ -5,9 +5,10 @@ import sqlite3
 import time
 import telebot
 from telebot import types
+import os
 
 # ================= НАСТРОЙКИ =================
-TOKEN = "BOT_TOKEN"
+TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 7917555581  # Вставь свой Telegram ID (число)
 # =============================================
 
