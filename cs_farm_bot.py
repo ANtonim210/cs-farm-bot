@@ -608,4 +608,5 @@ def callback_handler(call):
 if __name__ == "__main__":
     init_db()
     print("🚀 Ошибки кнопок устранены! Бот готов к работе.")
-    bot.infinity_polling(skip_pending=True)
+    bot.remove_webhook()
+bot.infinity_polling(skip_pending=True)
