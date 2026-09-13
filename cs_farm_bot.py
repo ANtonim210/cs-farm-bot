@@ -608,4 +608,4 @@ def callback_handler(call):
 if __name__ == "__main__":
     init_db()
     print("🚀 Ошибки кнопок устранены! Бот готов к работе.")
-    bot.infinity_polling(skip_pending=True, num_threads=5)
+    bot.infinity_polling(skip_pending=True)
