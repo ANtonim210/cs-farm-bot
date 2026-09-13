@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 
 # ================= НАСТРОЙКИ =================
-TOKEN = "8829638514:AAFiKvrW7Yj-0bVVwQBquzhUkz2_jwJoDZo"
+TOKEN = "BOT_TOKEN"
 ADMIN_ID = 7917555581  # Вставь свой Telegram ID (число)
 # =============================================
 
