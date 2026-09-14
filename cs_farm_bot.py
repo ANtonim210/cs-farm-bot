@@ -164,6 +164,7 @@ HTML_CODE = """
 </html>
 """
 
+# Должно стать:
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     return HTML_CODE
