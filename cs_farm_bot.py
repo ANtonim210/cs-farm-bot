@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import HTMLResponse
 import uvicorn
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -35,7 +35,10 @@ def init_db():
             version TEXT,
             description TEXT,
             image_id TEXT,
-            file_id TEXT NOT NULL
+            file_id_1 TEXT NOT NULL,
+            file_name_1 TEXT,
+            file_id_2 TEXT,
+            file_name_2 TEXT
         )
     """)
     conn.commit()
@@ -45,7 +48,11 @@ init_db()
 
 # --- FSM ДЛЯ ДОБАВЛЕНИЯ ФАЙЛОВ АДМИНОМ ---
 class AddItemState(StatesGroup):
-    file = State()
+    file1 = State()
+    file1_name = State()
+    file2_choice = State()
+    file2 = State()
+    file2_name = State()
     title = State()
     subtitle = State()
     tags = State()
@@ -74,24 +81,51 @@ async def start_cmd(message: types.Message):
 
 @dp.message(Command("admin"))
 async def admin_cmd(message: types.Message, state: FSMContext):
-    await message.answer("📥 **Загрузка нового файла в каталог.**\n\nОтправь мне файл (софт, архив или документ до 2 ГБ).")
-    await state.set_state(AddItemState.file)
+    await message.answer("📥 **Загрузка софта в каталог.**\n\nОтправь **первый (основной) файл**.")
+    await state.set_state(AddItemState.file1)
 
-@dp.message(AddItemState.file)
-async def process_file(message: types.Message, state: FSMContext):
-    file_id = None
-    if message.document:
-        file_id = message.document.file_id
-    elif message.video:
-        file_id = message.video.file_id
-    elif message.audio:
-        file_id = message.audio.file_id
-
+@dp.message(AddItemState.file1)
+async def process_file1(message: types.Message, state: FSMContext):
+    file_id = message.document.file_id if message.document else (message.video.file_id if message.video else (message.audio.file_id if message.audio else None))
     if not file_id:
-        await message.answer("⚠️ Пожалуйста, отправь файл или документ!")
+        await message.answer("⚠️ Пожалуйста, отправь документ или файл!")
         return
 
-    await state.update_data(file_id=file_id)
+    await state.update_data(file_id_1=file_id)
+    await message.answer("🏷 Напиши название для **первой кнопки** (например: *Скачать APK* или *Основной софт*):")
+    await state.set_state(AddItemState.file1_name)
+
+@dp.message(AddItemState.file1_name)
+async def process_file1_name(message: types.Message, state: FSMContext):
+    await state.update_data(file_name_1=message.text)
+    await message.answer("📎 Нужен ли **второй файл** для этой позиции? Напиши `Да` или `-` (нет):")
+    await state.set_state(AddItemState.file2_choice)
+
+@dp.message(AddItemState.file2_choice)
+async def process_file2_choice(message: types.Message, state: FSMContext):
+    text = message.text.strip().lower()
+    if text in ["да", "yes", "+"]:
+        await message.answer("📥 Отправь **второй файл**:")
+        await state.set_state(AddItemState.file2)
+    else:
+        await state.update_data(file_id_2=None, file_name_2=None)
+        await message.answer("✏️ Введи **Название софта** (например: *Axiom Soft*):")
+        await state.set_state(AddItemState.title)
+
+@dp.message(AddItemState.file2)
+async def process_file2(message: types.Message, state: FSMContext):
+    file_id = message.document.file_id if message.document else (message.video.file_id if message.video else (message.audio.file_id if message.audio else None))
+    if not file_id:
+        await message.answer("⚠️ Пожалуйста, отправь документ или файл!")
+        return
+
+    await state.update_data(file_id_2=file_id)
+    await message.answer("🏷 Напиши название для **второй кнопки** (например: *Скачать Кэш / Инжектор*):")
+    await state.set_state(AddItemState.file2_name)
+
+@dp.message(AddItemState.file2_name)
+async def process_file2_name(message: types.Message, state: FSMContext):
+    await state.update_data(file_name_2=message.text)
     await message.answer("✏️ Введи **Название софта** (например: *Axiom Soft*):")
     await state.set_state(AddItemState.title)
 
@@ -122,17 +156,14 @@ async def process_version(message: types.Message, state: FSMContext):
 @dp.message(AddItemState.description)
 async def process_desc(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text)
-    await message.answer("🖼 **Отправь картинку/скриншот** для баннера прямо сюда (или знак `-` если без картинки):")
+    await message.answer("🖼 **Отправь картинку/скриншот** для баннера (или знак `-` если без картинки):")
     await state.set_state(AddItemState.image)
 
 @dp.message(AddItemState.image)
 async def process_img(message: types.Message, state: FSMContext):
-    image_id = None
-    
-    if message.photo:
-        image_id = message.photo[-1].file_id
-    elif message.text and message.text.strip() != "-":
-        await message.answer("⚠️ Пожалуйста, отправь именно **картинку/скриншот** или знак `-`!")
+    image_id = message.photo[-1].file_id if message.photo else None
+    if not image_id and message.text and message.text.strip() != "-":
+        await message.answer("⚠️ Пожалуйста, отправь именно **картинку** или знак `-`!")
         return
 
     data = await state.get_data()
@@ -140,9 +171,14 @@ async def process_img(message: types.Message, state: FSMContext):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO items (title, subtitle, tags, version, description, image_id, file_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (data['title'], data['subtitle'], data['tags'], data['version'], data['description'], image_id, data['file_id']))
+        INSERT INTO items (title, subtitle, tags, version, description, image_id, file_id_1, file_name_1, file_id_2, file_name_2)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data['title'], data['subtitle'], data['tags'], data['version'], 
+        data['description'], image_id, 
+        data['file_id_1'], data.get('file_name_1', 'Скачать файл 1'), 
+        data.get('file_id_2'), data.get('file_name_2')
+    ))
     conn.commit()
     conn.close()
 
@@ -156,13 +192,14 @@ async def get_items():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT id, title, subtitle, tags, version, description, image_id FROM items ORDER BY id DESC")
+    cursor.execute("SELECT id, title, subtitle, tags, version, description, image_id, file_name_1, file_id_2, file_name_2 FROM items ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
     
     items = []
     for r in rows:
         item = dict(r)
+        item['has_second_file'] = bool(item['file_id_2'])
         if item['image_id']:
             try:
                 file_info = await bot.get_file(item['image_id'])
@@ -179,22 +216,27 @@ async def get_items():
 async def download_file(data: dict = Body(...)):
     item_id = data.get("id")
     user_id = data.get("user_id")
+    file_num = data.get("file_num", 1)
 
     if not item_id or not user_id:
         raise HTTPException(status_code=400, detail="Missing data")
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT file_id, title FROM items WHERE id = ?", (item_id,))
+    if file_num == 2:
+        cursor.execute("SELECT file_id_2, file_name_2 FROM items WHERE id = ?", (item_id,))
+    else:
+        cursor.execute("SELECT file_id_1, file_name_1 FROM items WHERE id = ?", (item_id,))
+    
     row = cursor.fetchone()
     conn.close()
 
-    if not row:
+    if not row or not row[0]:
         raise HTTPException(status_code=404, detail="File not found")
 
-    file_id, title = row
+    file_id, file_label = row
     try:
-        await bot.send_document(chat_id=user_id, document=file_id, caption=f"📥 Твой файл: **{title}**\nУдачной установки!")
+        await bot.send_document(chat_id=user_id, document=file_id, caption=f"📥 **{file_label}**\nУдачной установки!")
         return {"success": True}
     except Exception as e:
         logging.error(f"Error sending file: {e}")
@@ -213,7 +255,6 @@ HTML_CODE = """
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background: #090a10; color: #f1f3f9; padding-bottom: 85px; user-select: none; }
 
-        /* Шапка */
         .header {
             display: flex; justify-content: space-between; align-items: center;
             padding: 16px; background: #11131d; border-bottom: 1px solid #1c1f2e;
@@ -230,7 +271,6 @@ HTML_CODE = """
             border-radius: 10px; color: #a0aec0; display: flex; align-items: center; justify-content: center; font-size: 16px;
         }
 
-        /* Поиск */
         .search-container { padding: 14px 16px 6px 16px; display: flex; gap: 8px; }
         .search-box {
             flex: 1; background: #131622; border: 1px solid #22273b; border-radius: 14px;
@@ -238,10 +278,8 @@ HTML_CODE = """
         }
         .search-input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-size: 14px; }
 
-        /* Контейнер карточек */
         .catalog { padding: 12px 16px; display: flex; flex-direction: column; gap: 18px; }
 
-        /* Карточка Софта */
         .item-card {
             background: #11131f; border-radius: 20px; overflow: hidden;
             border: 1px solid #1f2436; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
@@ -270,11 +308,16 @@ HTML_CODE = """
         }
         .details-content.open { display: block; }
 
+        /* Контейнер кнопок скачивания */
+        .download-group { display: flex; flex-direction: column; gap: 8px; }
         .download-btn {
             width: 100%; background: linear-gradient(135deg, #a855f7, #7c3aed);
-            color: #fff; border: none; padding: 14px; border-radius: 14px;
-            font-size: 15px; font-weight: 800; display: flex; align-items: center;
-            justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+            color: #fff; border: none; padding: 12px; border-radius: 14px;
+            font-size: 14px; font-weight: 800; display: flex; align-items: center;
+            justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.2);
+        }
+        .download-btn.secondary {
+            background: #181b28; border: 1px solid #272c40; color: #a0aec0; box-shadow: none;
         }
         .download-btn:active { transform: scale(0.98); }
 
@@ -291,7 +334,7 @@ HTML_CODE = """
         .nav-link.active { color: #a855f7; }
         .nav-icon { font-size: 20px; }
 
-        /* --- МОДАЛЬНОЕ ОКНО ДИСКЛЕЙМЕРА --- */
+        /* Модальное окно */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(4, 5, 10, 0.92); backdrop-filter: blur(10px);
@@ -329,7 +372,6 @@ HTML_CODE = """
 </head>
 <body>
 
-    <!-- Модальное окно Оказа от ответственности -->
     <div id="disclaimer-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-title">⚠️ Ответственность</div>
@@ -349,7 +391,6 @@ HTML_CODE = """
         </div>
     </div>
 
-    <!-- Основной интерфейс -->
     <div class="header">
         <div class="brand">
             <div class="brand-icon">⚡</div>
@@ -389,7 +430,6 @@ HTML_CODE = """
 
         let allItems = [];
 
-        // Проверка согласился ли пользователь ранее
         if(localStorage.getItem('disclaimer_accepted') === 'true') {
             document.getElementById('disclaimer-modal').style.display = 'none';
         }
@@ -451,9 +491,16 @@ HTML_CODE = """
                             ${item.description || 'Описание отсутствует.'}
                         </div>
 
-                        <button class="download-btn" onclick="downloadItem(${item.id})">
-                            📥 Скачать файл
-                        </button>
+                        <div class="download-group">
+                            <button class="download-btn" onclick="downloadItem(${item.id}, 1)">
+                                📥 ${item.file_name_1 || 'Скачать файл'}
+                            </button>
+                            ${item.has_second_file ? `
+                                <button class="download-btn secondary" onclick="downloadItem(${item.id}, 2)">
+                                    📦 ${item.file_name_2 || 'Дополнительный файл'}
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -480,7 +527,7 @@ HTML_CODE = """
             renderCatalog(filtered);
         }
 
-        async function downloadItem(id) {
+        async function downloadItem(id, fileNum) {
             const userId = tg.initDataUnsafe?.user?.id;
             if(!userId) {
                 tg.showAlert("Запустите приложение внутри Telegram!");
@@ -493,7 +540,7 @@ HTML_CODE = """
             await fetch('/api/download', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: id, user_id: userId })
+                body: JSON.stringify({ id: id, user_id: userId, file_num: fileNum })
             });
         }
 
