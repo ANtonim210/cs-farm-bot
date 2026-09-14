@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, ReplyKeyboardRemove
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -56,6 +56,9 @@ class AddItemState(StatesGroup):
 # --- БОТ КОМАНДЫ ---
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
+    clean_msg = await message.answer("🔄 Обновляем интерфейс...", reply_markup=ReplyKeyboardRemove())
+    await clean_msg.delete()
+
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
             text="🚀 Открыть Каталог Софта",
@@ -63,8 +66,8 @@ async def start_cmd(message: types.Message):
         )
     ]])
     await message.answer(
-        "👋 **Добро пожаловать в файловый менеджер!**\n\n"
-        "Жми кнопку ниже, чтобы открыть официальный каталог, читать инструкции и скачивать софт напрямую в этот чат.",
+        "👋 **Добро пожаловать в CyberStore!**\n\n"
+        "Жми кнопку ниже, чтобы открыть каталог софта, читать инструкции и скачивать файлы напрямую в этот чат.",
         reply_markup=kb,
         parse_mode="Markdown"
     )
@@ -119,7 +122,7 @@ async def process_version(message: types.Message, state: FSMContext):
 @dp.message(AddItemState.description)
 async def process_desc(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text)
-    await message.answer("🖼 **Отправь картинку/скриншот** для баннера прямо сюда (или отправь '-' если без картинки):")
+    await message.answer("🖼 **Отправь картинку/скриншот** для баннера прямо сюда (или знак `-` если без картинки):")
     await state.set_state(AddItemState.image)
 
 @dp.message(AddItemState.image)
@@ -160,7 +163,6 @@ async def get_items():
     items = []
     for r in rows:
         item = dict(r)
-        # Если есть картинка в ТГ, получаем для неё прямую ссылку
         if item['image_id']:
             try:
                 file_info = await bot.get_file(item['image_id'])
@@ -211,7 +213,7 @@ HTML_CODE = """
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background: #090a10; color: #f1f3f9; padding-bottom: 85px; user-select: none; }
 
-        /* Верхняя Панель */
+        /* Шапка */
         .header {
             display: flex; justify-content: space-between; align-items: center;
             padding: 16px; background: #11131d; border-bottom: 1px solid #1c1f2e;
@@ -258,7 +260,6 @@ HTML_CODE = """
         }
         .version-pill { background: #181b28; color: #718096; border: 1px solid #272c40; font-size: 11px; padding: 4px 8px; border-radius: 8px; }
 
-        /* Выпадающее описание */
         .details-btn {
             background: none; border: none; color: #a0aec0; font-size: 13px; font-weight: 600;
             display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 0; margin-bottom: 10px;
@@ -269,7 +270,6 @@ HTML_CODE = """
         }
         .details-content.open { display: block; }
 
-        /* Кнопка скачивания */
         .download-btn {
             width: 100%; background: linear-gradient(135deg, #a855f7, #7c3aed);
             color: #fff; border: none; padding: 14px; border-radius: 14px;
@@ -278,7 +278,6 @@ HTML_CODE = """
         }
         .download-btn:active { transform: scale(0.98); }
 
-        /* Нижнее Меню */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: rgba(17, 19, 31, 0.95); backdrop-filter: blur(12px);
@@ -291,10 +290,66 @@ HTML_CODE = """
         }
         .nav-link.active { color: #a855f7; }
         .nav-icon { font-size: 20px; }
+
+        /* --- МОДАЛЬНОЕ ОКНО ДИСКЛЕЙМЕРА --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(4, 5, 10, 0.92); backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
+        }
+        .modal-card {
+            background: #11131f; border: 1px solid #272c40; border-radius: 24px;
+            padding: 24px; max-width: 400px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .modal-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .modal-body {
+            font-size: 13px; color: #94a3b8; line-height: 1.6; margin-bottom: 20px;
+            max-height: 220px; overflow-y: auto; padding-right: 6px;
+        }
+        .modal-body ul { margin-left: 18px; margin-top: 8px; }
+        .modal-body li { margin-bottom: 6px; }
+
+        .checkbox-container {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+            font-size: 13px; color: #cbd5e1; cursor: pointer; user-select: none;
+        }
+        .checkbox-container input { width: 18px; height: 18px; accent-color: #a855f7; cursor: pointer; }
+
+        .accept-btn {
+            width: 100%; background: #272c40; color: #64748b; border: none;
+            padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 800;
+            cursor: not-allowed; transition: all 0.2s ease;
+        }
+        .accept-btn.active {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        }
     </style>
 </head>
 <body>
 
+    <!-- Модальное окно Оказа от ответственности -->
+    <div id="disclaimer-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-title">⚠️ Ответственность</div>
+            <div class="modal-body">
+                Используя данное приложение, вы подтверждаете, что делаете это исключительно на свой страх и риск:
+                <ul>
+                    <li><b>Личная ответственность:</b> Вы самостоятельно отвечаете за загрузку, установку и последствия использования файлов.</li>
+                    <li><b>Принцип «Как есть»:</b> Софт предоставляется без гарантий. Разработчики не несут ответственности за блокировки или сбои устройств.</li>
+                    <li><b>Цифровая гигиена:</b> Всегда соблюдайте инструкции по установке.</li>
+                </ul>
+            </div>
+            <label class="checkbox-container">
+                <input type="checkbox" id="agree-checkbox" onchange="toggleAcceptBtn()">
+                <span>Я согласен и принимаю все риски</span>
+            </label>
+            <button id="accept-btn" class="accept-btn" disabled onclick="closeDisclaimer()">🚀 Войти в каталог</button>
+        </div>
+    </div>
+
+    <!-- Основной интерфейс -->
     <div class="header">
         <div class="brand">
             <div class="brand-icon">⚡</div>
@@ -333,6 +388,29 @@ HTML_CODE = """
         tg.expand();
 
         let allItems = [];
+
+        // Проверка согласился ли пользователь ранее
+        if(localStorage.getItem('disclaimer_accepted') === 'true') {
+            document.getElementById('disclaimer-modal').style.display = 'none';
+        }
+
+        function toggleAcceptBtn() {
+            const checked = document.getElementById('agree-checkbox').checked;
+            const btn = document.getElementById('accept-btn');
+            if(checked) {
+                btn.classList.add('active');
+                btn.disabled = false;
+            } else {
+                btn.classList.remove('active');
+                btn.disabled = true;
+            }
+        }
+
+        function closeDisclaimer() {
+            localStorage.setItem('disclaimer_accepted', 'true');
+            document.getElementById('disclaimer-modal').style.display = 'none';
+            tg.HapticFeedback.notificationOccurred('success');
+        }
 
         async function loadCatalog() {
             try {
