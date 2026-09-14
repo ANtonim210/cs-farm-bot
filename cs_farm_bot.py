@@ -1,300 +1,425 @@
 import os
 import asyncio
-import random
-from fastapi import FastAPI
+import sqlite3
+import logging
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import HTMLResponse
 import uvicorn
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
-# --- НАСТРОЙКИ ---
-TOKEN = os.getenv("BOT_TOKEN", "ТВОЙ_ТОКЕН_БОТА")
-WEBAPP_URL = "https://cs-farm-bot.onrender.com"  # Твой URL на Render
+# --- НАСТРОЙКИ ПРИЛОЖЕНИЯ ---
+TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_СВОЙ_ТОКЕН_ЗДЕСЬ")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://cs-farm-bot.onrender.com")
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 app = FastAPI()
 
-# --- ВЕБ-ИНТЕРФЕЙС (MINI APP) ---
+# --- БАЗА ДАННЫХ (SQLite) ---
+DB_FILE = "catalog.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            subtitle TEXT,
+            tags TEXT,
+            version TEXT,
+            description TEXT,
+            image_id TEXT,
+            file_id TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- FSM ДЛЯ ДОБАВЛЕНИЯ ФАЙЛОВ АДМИНОМ ---
+class AddItemState(StatesGroup):
+    file = State()
+    title = State()
+    subtitle = State()
+    tags = State()
+    version = State()
+    description = State()
+    image = State()
+
+# --- БОТ КОМАНДЫ ---
+@dp.message(Command("start"))
+async def start_cmd(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🚀 Открыть Каталог Софта",
+            web_app=WebAppInfo(url=WEBAPP_URL)
+        )
+    ]])
+    await message.answer(
+        "👋 **Добро пожаловать в файловый менеджер!**\n\n"
+        "Жми кнопку ниже, чтобы открыть официальный каталог, читать инструкции и скачивать софт напрямую в этот чат.",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+
+@dp.message(Command("admin"))
+async def admin_cmd(message: types.Message, state: FSMContext):
+    await message.answer("📥 **Загрузка нового файла в каталог.**\n\nОтправь мне файл (софт, архив или документ до 2 ГБ).")
+    await state.set_state(AddItemState.file)
+
+@dp.message(AddItemState.file)
+async def process_file(message: types.Message, state: FSMContext):
+    file_id = None
+    if message.document:
+        file_id = message.document.file_id
+    elif message.video:
+        file_id = message.video.file_id
+    elif message.audio:
+        file_id = message.audio.file_id
+
+    if not file_id:
+        await message.answer("⚠️ Пожалуйста, отправь файл или документ!")
+        return
+
+    await state.update_data(file_id=file_id)
+    await message.answer("✏️ Введи **Название софта** (например: *Axiom Soft*):")
+    await state.set_state(AddItemState.title)
+
+@dp.message(AddItemState.title)
+async def process_title(message: types.Message, state: FSMContext):
+    await state.update_data(title=message.text)
+    await message.answer("📝 Введи **Подзаголовок** (например: *Чит для iOS / PC*):")
+    await state.set_state(AddItemState.subtitle)
+
+@dp.message(AddItemState.subtitle)
+async def process_subtitle(message: types.Message, state: FSMContext):
+    await state.update_data(subtitle=message.text)
+    await message.answer("🏷 Введи **Теги** через запятую (например: *iOS, TrollStore, PC*):")
+    await state.set_state(AddItemState.tags)
+
+@dp.message(AddItemState.tags)
+async def process_tags(message: types.Message, state: FSMContext):
+    await state.update_data(tags=message.text)
+    await message.answer("📌 Введи **Версию** (например: *v0.39.2*):")
+    await state.set_state(AddItemState.version)
+
+@dp.message(AddItemState.version)
+async def process_version(message: types.Message, state: FSMContext):
+    await state.update_data(version=message.text)
+    await message.answer("📖 Введи **Подробное описание / Инструкцию по установке**:")
+    await state.set_state(AddItemState.description)
+
+@dp.message(AddItemState.description)
+async def process_desc(message: types.Message, state: FSMContext):
+    await state.update_data(description=message.text)
+    await message.answer("🖼 **Отправь картинку/скриншот** для баннера прямо сюда (или отправь '-' если без картинки):")
+    await state.set_state(AddItemState.image)
+
+@dp.message(AddItemState.image)
+async def process_img(message: types.Message, state: FSMContext):
+    image_id = None
+    
+    if message.photo:
+        image_id = message.photo[-1].file_id
+    elif message.text and message.text.strip() != "-":
+        await message.answer("⚠️ Пожалуйста, отправь именно **картинку/скриншот** или знак `-`!")
+        return
+
+    data = await state.get_data()
+    
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO items (title, subtitle, tags, version, description, image_id, file_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (data['title'], data['subtitle'], data['tags'], data['version'], data['description'], image_id, data['file_id']))
+    conn.commit()
+    conn.close()
+
+    await state.clear()
+    await message.answer("✅ **Софт успешно добавлен в каталог Mini App!**")
+
+# --- FASTAPI ПРИЛОЖЕНИЕ & ЭНДПОИНТЫ ---
+
+@app.get("/api/items")
+async def get_items():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, subtitle, tags, version, description, image_id FROM items ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    items = []
+    for r in rows:
+        item = dict(r)
+        # Если есть картинка в ТГ, получаем для неё прямую ссылку
+        if item['image_id']:
+            try:
+                file_info = await bot.get_file(item['image_id'])
+                item['image_url'] = f"https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}"
+            except Exception:
+                item['image_url'] = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"
+        else:
+            item['image_url'] = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800"
+        items.append(item)
+        
+    return items
+
+@app.post("/api/download")
+async def download_file(data: dict = Body(...)):
+    item_id = data.get("id")
+    user_id = data.get("user_id")
+
+    if not item_id or not user_id:
+        raise HTTPException(status_code=400, detail="Missing data")
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT file_id, title FROM items WHERE id = ?", (item_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_id, title = row
+    try:
+        await bot.send_document(chat_id=user_id, document=file_id, caption=f"📥 Твой файл: **{title}**\nУдачной установки!")
+        return {"success": True}
+    except Exception as e:
+        logging.error(f"Error sending file: {e}")
+        return {"success": False, "error": str(e)}
+
+# --- FRONTEND ИНТЕРФЕЙС (HTML/CSS/JS) ---
 HTML_CODE = """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>CS2 Lounge Mini App</title>
+    <title>CyberStore Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        body { background: #0c0d10; color: #fff; padding-bottom: 80px; user-select: none; }
+        body { background: #090a10; color: #f1f3f9; padding-bottom: 85px; user-select: none; }
 
-        /* Шапка */
+        /* Верхняя Панель */
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 16px; background: #12141a; border-bottom: 1px solid #1e222d;
+            padding: 16px; background: #11131d; border-bottom: 1px solid #1c1f2e;
             position: sticky; top: 0; z-index: 100;
         }
-        .logo { font-size: 16px; font-weight: 800; color: #f3ba2f; display: flex; align-items: center; gap: 6px; }
-        .balance-chip {
-            background: #1a1d26; border: 1px solid #2d3345; padding: 6px 12px;
-            border-radius: 20px; font-weight: 700; font-size: 13px; color: #f3ba2f;
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; color: #a855f7; }
+        .brand-icon {
+            width: 32px; height: 32px; background: linear-gradient(135deg, #a855f7, #6366f1);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px;
         }
-        .user-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #f3ba2f; }
-
-        /* Страницы */
-        .page { display: none; padding: 16px; }
-        .page.active { display: block; }
-
-        /* Сетка игр */
-        .games-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .game-card {
-            background: linear-gradient(145deg, #151821, #1a1e2b); border-radius: 14px;
-            padding: 14px; border: 1px solid #222634; text-align: center; cursor: pointer;
-        }
-        .game-card:active { transform: scale(0.98); }
-        .game-icon { font-size: 32px; margin-bottom: 6px; }
-        .game-title { font-size: 14px; font-weight: 700; }
-        .game-desc { font-size: 10px; color: #6c757d; margin-top: 2px; }
-
-        /* Карточки скинов */
-        .skin-card {
-            background: #161822; border-radius: 10px; padding: 10px; margin-top: 8px;
-            display: flex; align-items: center; gap: 10px; border-left: 4px solid #fff;
-        }
-        .skin-card.covert { border-left-color: #eb4b4b; }
-        .skin-card.classified { border-left-color: #d32ce6; }
-        .skin-card.restricted { border-left-color: #8847ff; }
-        .skin-card.mil-spec { border-left-color: #4b69ff; }
-        .skin-img { width: 50px; height: 40px; object-fit: contain; }
-
-        /* Формы и кнопки */
-        .input-field {
-            width: 100%; padding: 12px; background: #161822; border: 1px solid #232736;
-            color: #fff; border-radius: 10px; margin: 8px 0; font-size: 14px;
-        }
-        .btn {
-            width: 100%; background: #f3ba2f; color: #000; border: none; padding: 12px;
-            border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; margin-top: 6px;
-        }
-        .btn-danger { background: #e53935; color: #fff; }
-
-        /* Мины */
-        .mines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0; }
-        .mine-cell {
-            aspect-ratio: 1; background: #1a1d26; border: 1px solid #2d3345;
-            border-radius: 8px; font-size: 20px; display: flex; align-items: center;
-            justify-content: center; cursor: pointer;
+        .header-actions { display: flex; gap: 8px; }
+        .icon-btn {
+            width: 38px; height: 38px; background: #181b28; border: 1px solid #272c40;
+            border-radius: 10px; color: #a0aec0; display: flex; align-items: center; justify-content: center; font-size: 16px;
         }
 
-        /* Нижнее меню */
+        /* Поиск */
+        .search-container { padding: 14px 16px 6px 16px; display: flex; gap: 8px; }
+        .search-box {
+            flex: 1; background: #131622; border: 1px solid #22273b; border-radius: 14px;
+            padding: 10px 14px; display: flex; align-items: center; gap: 10px; color: #a0aec0;
+        }
+        .search-input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-size: 14px; }
+
+        /* Контейнер карточек */
+        .catalog { padding: 12px 16px; display: flex; flex-direction: column; gap: 18px; }
+
+        /* Карточка Софта */
+        .item-card {
+            background: #11131f; border-radius: 20px; overflow: hidden;
+            border: 1px solid #1f2436; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .banner-container { width: 100%; height: 180px; position: relative; background: #181b28; }
+        .banner-img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .card-body { padding: 16px; }
+        .item-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        .item-subtitle { font-size: 13px; color: #8c9bce; margin-bottom: 10px; }
+
+        .tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .tag-pill {
+            background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3);
+            color: #c084fc; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px;
+        }
+        .version-pill { background: #181b28; color: #718096; border: 1px solid #272c40; font-size: 11px; padding: 4px 8px; border-radius: 8px; }
+
+        /* Выпадающее описание */
+        .details-btn {
+            background: none; border: none; color: #a0aec0; font-size: 13px; font-weight: 600;
+            display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 0; margin-bottom: 10px;
+        }
+        .details-content {
+            display: none; background: #0b0d16; border-radius: 12px; padding: 12px;
+            font-size: 12px; color: #a0aec0; line-height: 1.5; margin-bottom: 14px; border: 1px solid #1a1e2e;
+        }
+        .details-content.open { display: block; }
+
+        /* Кнопка скачивания */
+        .download-btn {
+            width: 100%; background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: #fff; border: none; padding: 14px; border-radius: 14px;
+            font-size: 15px; font-weight: 800; display: flex; align-items: center;
+            justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+        }
+        .download-btn:active { transform: scale(0.98); }
+
+        /* Нижнее Меню */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(18, 20, 26, 0.95); backdrop-filter: blur(10px);
-            border-top: 1px solid #1e222d; display: flex; justify-content: space-around;
-            padding: 10px 0 16px 0; z-index: 1000;
+            background: rgba(17, 19, 31, 0.95); backdrop-filter: blur(12px);
+            border-top: 1px solid #1c1f2e; display: flex; justify-content: space-around;
+            padding: 12px 0 20px 0; z-index: 1000;
         }
-        .nav-item {
-            display: flex; flex-direction: column; align-items: center; gap: 2px;
-            color: #6c757d; font-size: 10px; font-weight: 600; cursor: pointer; width: 20%;
+        .nav-link {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            color: #64748b; font-size: 11px; font-weight: 700; cursor: pointer; width: 45%;
         }
-        .nav-item.active { color: #f3ba2f; }
+        .nav-link.active { color: #a855f7; }
+        .nav-icon { font-size: 20px; }
     </style>
 </head>
 <body>
 
-    <!-- Шапка -->
     <div class="header">
-        <div class="logo">⚡ CS2 LOUNGE</div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="balance-chip">🪙 <span id="coins-val">1000</span></div>
-            <img id="user-avatar" class="user-avatar" src="https://ui-avatars.com/api/?name=U&background=1a1d26&color=f3ba2f" alt="avatar">
+        <div class="brand">
+            <div class="brand-icon">⚡</div>
+            <span>CyberStore</span>
+        </div>
+        <div class="header-actions">
+            <div class="icon-btn">👤</div>
+            <div class="icon-btn">☰</div>
         </div>
     </div>
 
-    <!-- 1. ГЛАВНАЯ (ИГРЫ) -->
-    <div id="page-games" class="page active">
-        <div class="games-grid">
-            <div class="game-card" onclick="switchPage('cases')">
-                <div class="game-icon">📦</div>
-                <div class="game-title">Кейсы</div>
-                <div class="game-desc">Все категории CS2</div>
-            </div>
-            <div class="game-card" onclick="switchPage('crash')">
-                <div class="game-icon">📈</div>
-                <div class="game-title">Краш</div>
-                <div class="game-desc">Успей забрать занос</div>
-            </div>
-            <div class="game-card" onclick="switchPage('mines')">
-                <div class="game-icon">💣</div>
-                <div class="game-title">Мины</div>
-                <div class="game-desc">Не наступи на бомбу</div>
-            </div>
-            <div class="game-card" onclick="switchPage('upgrader')">
-                <div class="game-icon">⚡</div>
-                <div class="game-title">Апгрейдер</div>
-                <div class="game-desc">Обнови свой скин</div>
-            </div>
+    <div class="search-container">
+        <div class="search-box">
+            <span>🔍</span>
+            <input id="search" type="text" class="search-input" placeholder="Поиск по каталогу..." oninput="filterItems()">
         </div>
     </div>
 
-    <!-- 2. КЕЙСЫ -->
-    <div id="page-cases" class="page">
-        <h3>📦 Выберите кейс</h3>
-        <div class="games-grid" style="margin-top:10px;">
-            <div class="game-card" onclick="openCase('weapon')">
-                <div class="game-title">Оружейный</div>
-                <div class="game-desc">100 🪙</div>
-            </div>
-            <div class="game-card" onclick="openCase('knife')">
-                <div class="game-title">🗡 Ножевой</div>
-                <div class="game-desc">500 🪙</div>
-            </div>
-        </div>
-        <div id="case-result" style="margin-top:15px;"></div>
+    <div id="catalog" class="catalog">
+        <p style="text-align:center; color:#64748b; margin-top:30px;">Загрузка каталога...</p>
     </div>
 
-    <!-- 3. КРАШ -->
-    <div id="page-crash" class="page" style="text-align:center;">
-        <h3>📈 Краш Игра</h3>
-        <h1 id="crash-mult" style="font-size:42px; color:#28a745; margin:15px 0;">x1.00</h1>
-        <button id="crash-btn" class="btn" onclick="handleCrash()">Ставка (50 🪙)</button>
-    </div>
-
-    <!-- 4. МИНЫ -->
-    <div id="page-mines" class="page">
-        <h3>💣 Игра Мины</h3>
-        <p style="font-size:12px; color:#6c757d;">Открывайте ячейки и забирайте занос!</p>
-        <div class="mines-grid" id="mines-grid"></div>
-        <button class="btn" onclick="initMines()">Новая игра (50 🪙)</button>
-    </div>
-
-    <!-- 5. ДОНАТ / ПРОМО -->
-    <div id="page-donate" class="page">
-        <h3>💎 Пополнение & Промокоды</h3>
-        <input id="promo-code" type="text" placeholder="Введите промокод" class="input-field">
-        <button class="btn" onclick="usePromo()">Активировать промокод</button>
-        <hr style="border-color:#222634; margin:15px 0;">
-        <button class="btn" style="background:#28a745; color:#fff;" onclick="tg.showAlert('Для доната напишите создателю бота!')">💎 Пополнить баланс</button>
-    </div>
-
-    <!-- 6. ПРОФИЛЬ / ИНВЕНТАРЬ -->
-    <div id="page-profile" class="page">
-        <h3>🎒 Мой Инвентарь</h3>
-        <div id="inv-list"><p style="color:#6c757d; margin-top:10px;">Инвентарь пуст.</p></div>
-    </div>
-
-    <!-- Нижнее меню -->
     <div class="bottom-nav">
-        <div class="nav-item active" onclick="switchNav('games', this)"><span>🎮</span><span>Игры</span></div>
-        <div class="nav-item" onclick="switchNav('donate', this)"><span>💎</span><span>Донат</span></div>
-        <div class="nav-item" onclick="switchNav('profile', this)"><span>🎒</span><span>Скины</span></div>
+        <div class="nav-link active">
+            <span class="nav-icon">📁</span>
+            <span>Библиотека</span>
+        </div>
+        <div class="nav-link">
+            <span class="nav-icon">👤</span>
+            <span>Профиль</span>
+        </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let coins = 1000;
-        let inventory = [];
+        let allItems = [];
 
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            const u = tg.initDataUnsafe.user;
-            if (u.photo_url) document.getElementById('user-avatar').src = u.photo_url;
+        async function loadCatalog() {
+            try {
+                const res = await fetch('/api/items');
+                allItems = await res.json();
+                renderCatalog(allItems);
+            } catch(e) {
+                document.getElementById('catalog').innerHTML = '<p style="text-align:center; color:#ef4444;">Ошибка загрузки каталога</p>';
+            }
         }
 
-        function updateUI() { document.getElementById('coins-val').innerText = coins; }
-
-        function switchPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-' + pageId).classList.add('active');
-        }
-
-        function switchNav(pageId, el) {
-            switchPage(pageId);
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            el.classList.add('active');
-        }
-
-        // Шансы и Скины
-        const skinsDB = [
-            { name: "AWP | Dragon Lore", type: "covert", price: 3000, chance: 0.02, img: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZFCb4d11VJ8x45bf4-te358X54iXdd83Hdd434g184451R42f46_n36f_45_282f9" },
-            { name: "AK-47 | Neon Rider", type: "classified", price: 800, chance: 0.10, img: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZFCb4d11VJ8x45bf4-te358X5cI3Bf71Hdd434g184451R42f46_n36f_45_282f9" },
-            { name: "M4A4 | Evil Daimyo", type: "restricted", price: 200, chance: 0.30, img: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZFCb4d11VJ8x45bf4-te358X54d434g184451R42f46_n36f_45_282f9" },
-            { name: "USP-S | Lead Conduit", type: "mil-spec", price: 50, chance: 0.58, img: "https://community.cloudflare.steamstatic.com/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZFCb4d11VJ8x45bf4-te358X54d321g184451R42f46_n36f_45_282f9" }
-        ];
-
-        function openCase(type) {
-            const cost = type === 'knife' ? 500 : 100;
-            if (coins < cost) { tg.showAlert("Не хватает монет!"); return; }
-            coins -= cost;
-            updateUI();
-
-            const rand = Math.random();
-            let cumulative = 0;
-            let drop = skinsDB[skinsDB.length - 1];
-
-            for (let item of skinsDB) {
-                cumulative += item.chance;
-                if (rand <= cumulative) { drop = item; break; }
+        function renderCatalog(items) {
+            const container = document.getElementById('catalog');
+            if(items.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#64748b; margin-top:30px;">Файлов пока нет</p>';
+                return;
             }
 
-            inventory.push(drop);
-            document.getElementById('case-result').innerHTML = `
-                <div class="skin-card ${drop.type}">
-                    <img class="skin-img" src="${drop.img}">
-                    <div><div><b>${drop.name}</b></div><div style="color:#f3ba2f;">${drop.price} 🪙</div></div>
+            container.innerHTML = items.map(item => `
+                <div class="item-card">
+                    <div class="banner-container">
+                        <img class="banner-img" src="${item.image_url}" alt="banner">
+                    </div>
+                    <div class="card-body">
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-subtitle">${item.subtitle || ''}</div>
+
+                        <div class="tags-row">
+                            ${(item.tags || '').split(',').map(t => `<span class="tag-pill">${t.trim()}</span>`).join('')}
+                            ${item.version ? `<span class="version-pill">${item.version}</span>` : ''}
+                        </div>
+
+                        <button class="details-btn" onclick="toggleDetails(${item.id})">
+                            <span id="arrow-${item.id}">▼</span> Подробнее / Инструкция
+                        </button>
+
+                        <div id="desc-${item.id}" class="details-content">
+                            ${item.description || 'Описание отсутствует.'}
+                        </div>
+
+                        <button class="download-btn" onclick="downloadItem(${item.id})">
+                            📥 Скачать файл
+                        </button>
+                    </div>
                 </div>
-            `;
-            renderInv();
+            `).join('');
         }
 
-        function renderInv() {
-            const list = document.getElementById('inv-list');
-            if (inventory.length === 0) return;
-            list.innerHTML = "";
-            inventory.forEach(item => {
-                list.innerHTML += `
-                    <div class="skin-card ${item.type}">
-                        <img class="skin-img" src="${item.img}">
-                        <div><div><b>${item.name}</b></div><div style="color:#f3ba2f;">${item.price} 🪙</div></div>
-                    </div>
-                `;
+        function toggleDetails(id) {
+            const el = document.getElementById(`desc-${id}`);
+            const arrow = document.getElementById(`arrow-${id}`);
+            if(el.classList.contains('open')) {
+                el.classList.remove('open');
+                arrow.innerText = '▼';
+            } else {
+                el.classList.add('open');
+                arrow.innerText = '▲';
+            }
+        }
+
+        function filterItems() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const filtered = allItems.filter(i => 
+                i.title.toLowerCase().includes(query) || 
+                (i.tags && i.tags.toLowerCase().includes(query))
+            );
+            renderCatalog(filtered);
+        }
+
+        async function downloadItem(id) {
+            const userId = tg.initDataUnsafe?.user?.id;
+            if(!userId) {
+                tg.showAlert("Запустите приложение внутри Telegram!");
+                return;
+            }
+
+            tg.HapticFeedback.impactOccurred('medium');
+            tg.showAlert("📥 Бот уже отправляет файл вам в личные сообщения!");
+
+            await fetch('/api/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, user_id: userId })
             });
         }
 
-        // Мины
-        function initMines() {
-            if (coins < 50) { tg.showAlert("Не хватает монет!"); return; }
-            coins -= 50; updateUI();
-            const grid = document.getElementById('mines-grid');
-            grid.innerHTML = "";
-            const bombIndex = Math.floor(Math.random() * 25);
-            for(let i=0; i<25; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'mine-cell';
-                cell.onclick = () => {
-                    if (i === bombIndex) {
-                        cell.innerText = "💥"; cell.style.background = "#e53935";
-                        tg.showAlert("БУМ! Вы подорвались!");
-                    } else {
-                        cell.innerText = "💎"; cell.style.background = "#28a745";
-                        coins += 20; updateUI();
-                    }
-                };
-                grid.appendChild(cell);
-            }
-        }
-
-        function usePromo() {
-            const code = document.getElementById('promo-code').value.trim();
-            if (code.toLowerCase() === 'start') {
-                coins += 500; updateUI();
-                tg.showAlert("Промокод активирован! +500 монет!");
-            } else {
-                tg.showAlert("Неверный промокод!");
-            }
-        }
+        loadCatalog();
     </script>
 </body>
 </html>
@@ -304,34 +429,7 @@ HTML_CODE = """
 async def read_root():
     return HTML_CODE
 
-# --- ЛОГИКА ТЕЛЕГРАМ БОТА ---
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text="🎮 Открыть CS2 Lounge Mini App", 
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]])
-    await message.answer(
-        "👋 **Добро пожаловать в CS2 Lounge!**\n\n"
-        "🎮 Нажимай кнопку ниже, чтобы запустить Mini App:\n"
-        "• Открывай кейсы с реальными шансами\n"
-        "• Играй в Краш, Мины и Апгрейдер\n"
-        "• Активируй промокоды и забирай заносы!",
-        reply_markup=kb,
-        parse_mode="Markdown"
-    )
-
-@dp.message(Command("top"))
-async def top_cmd(message: types.Message):
-    await message.answer("🏆 **Топ-5 игроков сезона:**\n1. Clean#смешарик — 15,400 🪙\n2. Alex — 12,100 🪙\n3. CS_GOAT — 9,800 🪙\n4. Trader99 — 8,500 🪙\n5. DragonKing — 7,200 🪙")
-
-@dp.message(Command("help"))
-async def help_cmd(message: types.Message):
-    await message.answer("ℹ️ **Помощь:**\nИспользуй команду /start или нажимай синюю кнопку «Играть» в меню, чтобы открыть приложение.")
-
-# --- ЗАПУСК И БОТА, И ВЕБ-СЕРВЕРА ---
+# --- СТАРТ СЕРВЕРА ---
 async def main():
     config = uvicorn.Config(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
     server = uvicorn.Server(config)
